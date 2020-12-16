@@ -5,7 +5,7 @@
     "author": "Juan Vázquez Moreno <vmjuan90@gmail.com>",
     "website": "https://guadalstore.com",
     "category": "",
-    "depends": ["website_sale_stock"],
+    "depends": ["website_sale_stock", "website_sale_delivery"],
     "data": [
             'views/delivery_view.xml'
         ],
