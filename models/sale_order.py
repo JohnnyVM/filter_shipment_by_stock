@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-# Part of Odoo. see License file for full copyright and licensing details.
+
+"""
+    Override the shipping methods output
+"""
+
 import logging
 
 from odoo import models
@@ -9,19 +13,18 @@ _logger = logging.getLogger(__name__)
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
 
-    def __miss_qty(self, asked: dict, available: dict) -> list:
-        """ List with the missing product """
-        missing = []
-        for key in asked.keys():
-            if asked[key] > available.get(key, 0):
-                missing.append(key)
-        return missing
-
-
     def _get_delivery_methods(self):
         """
         Remove shipping methods if warehouse defined and stock no available
         """
+        def __miss_qty(asked: dict, available: dict) -> list:
+            """ List with the missing product """
+            missing = []
+            for key in asked.keys():
+                if asked[key] > available.get(key, 0):
+                    missing.append(key)
+            return missing
+
         delivery_methods = super(SaleOrder, self)._get_delivery_methods()
 
         # No warehouse defined
@@ -30,7 +33,9 @@ class SaleOrder(models.Model):
             return delivery_methods
 
         # get the product qty in the order
-        order_line = self.order_line.filtered('is_delivery')
+        order_line = self.order_line.filtered(
+            lambda x: x.is_delivery or x.product_id.product_tmpl_id.type != 'product'
+        )
         order_qty = dict(zip(
             order_line.mapped('product_id.id'),
             order_line.mapped('product_qty')
@@ -40,16 +45,15 @@ class SaleOrder(models.Model):
         discart = self.env['delivery.carrier']
         delivery_warehouse = delivery_methods - no_warehouse
         for shipping in delivery_warehouse:
-            # TODO move to memory location and quant
             stock_location = self.env['stock.quant'].search([
                 ('location_id', 'in', shipping.stock_warehouse_ids.lot_stock_id.ids),
                 ('product_id', 'in', order_line.mapped('product_id.id'))
             ])
-            for product_id in order_line.mapped('product_id.id'):
-                warehouse_qty[product_id] = \
-                        sum(stock_location.filtered(lambda x: x.product_id == product_id).mapped('available_quantity'))
+            for product in order_line.mapped('product_id'):
+                warehouse_qty[product.id] = \
+                        sum(stock_location.filtered(lambda x: x.product_id == product.id).mapped('available_quantity'))
 
-            missing_stock = self.__miss_qty(order_qty, warehouse_qty)
+            missing_stock = __miss_qty(order_qty, warehouse_qty)
             if missing_stock:
                 _logger.info(
                         "Order: %s. Shipping: %s discarted. Missing products: %s",
