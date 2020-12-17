@@ -34,7 +34,7 @@ class SaleOrder(models.Model):
 
         # get the product qty in the order
         order_line = self.order_line.filtered(
-            lambda x: x.is_delivery or x.product_id.product_tmpl_id.type != 'product'
+            lambda x: (not x.is_delivery) and x.product_id.product_tmpl_id.type == 'product'
         )
         order_qty = dict(zip(
             order_line.mapped('product_id.id'),
